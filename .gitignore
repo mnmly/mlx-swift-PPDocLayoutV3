@@ -1,0 +1,24 @@
+## Build artifacts
+.build/
+.xcdd/
+.xcdd-rel/
+*.xcdd/
+DerivedData/
+docs/
+
+## Xcode
+xcuserdata/
+*.xcuserstate
+.DS_Store
+
+## Swift Package Manager
+.swiftpm/
+
+## Large / regenerable fixtures (run reference/dump_fixtures.py to recreate)
+fixtures/*.safetensors
+
+## Python
+__pycache__/
+*.pyc
+.venv/
+*.profraw
