@@ -18,7 +18,7 @@ let package = Package(
         .executable(name: "PPDocLayoutBench", targets: ["PPDocLayoutBench"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/ml-explore/mlx-swift", .upToNextMinor(from: "0.31.3")),
+        .package(url: "https://github.com/ml-explore/mlx-swift", "0.31.3" ..< "0.33.0"),
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.3"),
     ],
     targets: [
