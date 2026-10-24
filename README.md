@@ -18,7 +18,7 @@ global pointer**. ~33M params, fixed 800×800 input, single forward pass.
 
 ## Source of truth
 
-Ported 1:1 from the official `transformers` (5.12.x) PyTorch reference
+Ported 1:1 from the official `transformers` (5.20.x) PyTorch reference
 `transformers/models/pp_doclayout_v3/` (copies under `reference/python/`), with the
 HGNetV2-L backbone from `transformers/models/hgnet_v2/`. Weights:
 `PaddlePaddle/PP-DocLayoutV3_safetensors` (PyTorch NCHW, transposed to MLX NHWC at load).
