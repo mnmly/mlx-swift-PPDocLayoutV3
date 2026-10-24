@@ -54,3 +54,14 @@ For lower-level use, ``PPDocLayoutV3Model`` exposes the raw forward pass and
 ### Weights
 
 - ``loadWeights(url:into:dtype:verify:)``
+
+### Training
+
+- ``HeadTrainer``
+- ``Target``
+- ``HungarianMatcher``
+- ``MatchCost``
+- ``DetectionLoss``
+- ``DetectionLossConfig``
+- ``LossBreakdown``
+- ``BoxOps``

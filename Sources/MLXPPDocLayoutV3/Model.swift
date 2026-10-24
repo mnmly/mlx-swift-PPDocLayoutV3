@@ -165,8 +165,20 @@ public final class PPDocLayoutV3Model: Module {
                      encOutputsCoord: encBboxHead(outputMemory) + anchors)
     }
 
+    /// Inputs the decoder consumes, produced by the backbone + hybrid encoder +
+    /// query-selection trunk. Used by both inference (``callAsFunction(_:)``) and
+    /// head-only training, where the trunk is frozen and these are computed once.
+    public struct DecoderInputs {
+        public var target: MLXArray          // (B, Q, d_model) selected query features
+        public var value: MLXArray           // (B, S, d_model) flattened encoder memory
+        public var referenceUnact: MLXArray  // (B, Q, 4) pre-sigmoid reference boxes
+        public var spatialShapes: [(Int, Int)]
+        public var maskFeat: MLXArray         // (B, mH, mW, numPrototypes)
+    }
+
+    /// Run backbone → encoder → query selection, returning the decoder inputs.
     /// pixelValues: (B, H, W, 3) NHWC, already preprocessed.
-    public func callAsFunction(_ pixelValues: MLXArray) -> PPDocLayoutV3Output {
+    public func decoderInputs(_ pixelValues: MLXArray) -> DecoderInputs {
         let feats = backbone(pixelValues) // [stage0(x4), stage1, stage2, stage3]
         let x4Feat = feats[0]
         var projFeats: [MLXArray] = []
@@ -220,12 +232,24 @@ public final class PPDocLayoutV3Model: Module {
             referenceUnact = inverseSigmoid(refBoxes)
         }
 
-        let out = decoder(
-            target: target, value: sourceFlatten, referencePointsUnact: referenceUnact,
-            spatialShapes: spatialShapes,
-            orderHead: decoderOrderHead, globalPointer: decoderGlobalPointer,
-            maskQueryHead: maskQueryHead, norm: decoderNorm, maskFeat: enc.maskFeat)
+        return DecoderInputs(
+            target: target, value: sourceFlatten, referenceUnact: referenceUnact,
+            spatialShapes: spatialShapes, maskFeat: enc.maskFeat)
+    }
 
+    /// Run the decoder given precomputed trunk inputs.
+    func runDecoder(_ inputs: DecoderInputs) -> DecoderOutput {
+        decoder(
+            target: inputs.target, value: inputs.value,
+            referencePointsUnact: inputs.referenceUnact,
+            spatialShapes: inputs.spatialShapes,
+            orderHead: decoderOrderHead, globalPointer: decoderGlobalPointer,
+            maskQueryHead: maskQueryHead, norm: decoderNorm, maskFeat: inputs.maskFeat)
+    }
+
+    /// pixelValues: (B, H, W, 3) NHWC, already preprocessed.
+    public func callAsFunction(_ pixelValues: MLXArray) -> PPDocLayoutV3Output {
+        let out = runDecoder(decoderInputs(pixelValues))
         return PPDocLayoutV3Output(
             logits: out.logits, predBoxes: out.predBoxes,
             orderLogits: out.orderLogits, outMasks: out.outMasks)

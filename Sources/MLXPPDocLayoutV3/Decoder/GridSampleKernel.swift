@@ -93,6 +93,10 @@ private let vjpSource = """
 
     if (b >= B) return;
 
+    // Incoming cotangent dL/d(out) for this output element.
+    int out_idx = ((b * gH + h) * gW + w) * C + c;
+    float g = cotangent[out_idx];
+
     uint grid_idx = ((b * gH + h) * gW + w) * 2;
     // align_corners=False (matches torch.nn.functional.grid_sample): ((g+1)*W - 1) / 2
     float ix = ((grid[grid_idx] + 1) * W - 1) / 2.0;
@@ -117,17 +121,17 @@ private let vjpSource = """
 
     int base_idx = b * b_stride + c;
 
-    // x_grad: scatter cotangent back to source pixels
+    // x_grad: scatter weight * cotangent back to source pixels
     if (iy_nw >= 0 && iy_nw < H && ix_nw >= 0 && ix_nw < W)
-        atomic_fetch_add_explicit(&x_grad[base_idx + iy_nw * h_stride + ix_nw * w_stride], nw, memory_order_relaxed);
+        atomic_fetch_add_explicit(&x_grad[base_idx + iy_nw * h_stride + ix_nw * w_stride], nw * g, memory_order_relaxed);
     if (iy_ne >= 0 && iy_ne < H && ix_ne >= 0 && ix_ne < W)
-        atomic_fetch_add_explicit(&x_grad[base_idx + iy_ne * h_stride + ix_ne * w_stride], ne, memory_order_relaxed);
+        atomic_fetch_add_explicit(&x_grad[base_idx + iy_ne * h_stride + ix_ne * w_stride], ne * g, memory_order_relaxed);
     if (iy_sw >= 0 && iy_sw < H && ix_sw >= 0 && ix_sw < W)
-        atomic_fetch_add_explicit(&x_grad[base_idx + iy_sw * h_stride + ix_sw * w_stride], sw, memory_order_relaxed);
+        atomic_fetch_add_explicit(&x_grad[base_idx + iy_sw * h_stride + ix_sw * w_stride], sw * g, memory_order_relaxed);
     if (iy_se >= 0 && iy_se < H && ix_se >= 0 && ix_se < W)
-        atomic_fetch_add_explicit(&x_grad[base_idx + iy_se * h_stride + ix_se * w_stride], se, memory_order_relaxed);
+        atomic_fetch_add_explicit(&x_grad[base_idx + iy_se * h_stride + ix_se * w_stride], se * g, memory_order_relaxed);
 
-    // grid_grad: compute dL/dgrid at this (x,y) position
+    // grid_grad: compute dL/dgrid at this (x,y) position = (d out/d grid) * cotangent
     float gix = 0.0;
     float giy = 0.0;
 
@@ -153,8 +157,9 @@ private let vjpSource = """
     }
 
     // Normalize to [-1,1] coordinate gradient (align_corners=False: dix/dgrid = W/2)
-    gix *= float(W) / 2.0;
-    giy *= float(H) / 2.0;
+    // and scale by the incoming cotangent.
+    gix *= float(W) / 2.0 * g;
+    giy *= float(H) / 2.0 * g;
 
     atomic_fetch_add_explicit(&grid_grad[grid_idx], gix, memory_order_relaxed);
     atomic_fetch_add_explicit(&grid_grad[grid_idx + 1], giy, memory_order_relaxed);

@@ -80,12 +80,18 @@ final class DecoderLayer: Module {
     }
 }
 
-/// Output of the decoder (last layer only — sufficient for ForObjectDetection).
+/// Output of the decoder. `logits`/`predBoxes`/`orderLogits`/`outMasks` hold the
+/// last layer (sufficient for `ForObjectDetection` inference). `interLogits` and
+/// `interBoxes` hold the per-layer class logits / cxcywh boxes, used only by the
+/// training set criterion for auxiliary (deep-supervision) losses; they are lazy
+/// and impose no cost on the inference path that ignores them.
 public struct DecoderOutput {
     public var logits: MLXArray       // (B, Q, numLabels)
     public var predBoxes: MLXArray    // (B, Q, 4) cxcywh
     public var orderLogits: MLXArray  // (B, Q, Q)
     public var outMasks: MLXArray     // (B, Q, mH, mW)
+    public var interLogits: [MLXArray] // per layer: (B, Q, numLabels)
+    public var interBoxes: [MLXArray]  // per layer: (B, Q, 4) cxcywh
 }
 
 public final class Decoder: Module {
@@ -124,6 +130,8 @@ public final class Decoder: Module {
         var lastRef = referencePoints
         var lastOrder = MLXArray.zeros([B, Q, Q])
         var lastMask = MLXArray.zeros([B, Q, mH, mW])
+        var interLogits: [MLXArray] = []
+        var interBoxes: [MLXArray] = []
 
         for (idx, layer) in layers.enumerated() {
             let posEmb = queryPosHead(referencePoints)
@@ -138,8 +146,12 @@ public final class Decoder: Module {
             lastMask = matmul(maskQueryEmbed, maskFeatFlat).reshaped([B, Q, mH, mW])
             lastLogits = classEmbed(outQuery)
             lastOrder = globalPointer(orderHead[idx](outQuery))
+
+            interLogits.append(lastLogits)
+            interBoxes.append(referencePoints)
         }
 
-        return DecoderOutput(logits: lastLogits, predBoxes: lastRef, orderLogits: lastOrder, outMasks: lastMask)
+        return DecoderOutput(logits: lastLogits, predBoxes: lastRef, orderLogits: lastOrder,
+                             outMasks: lastMask, interLogits: interLogits, interBoxes: interBoxes)
     }
 }
