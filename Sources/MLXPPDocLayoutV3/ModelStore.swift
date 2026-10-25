@@ -41,7 +41,11 @@ public enum ModelStore {
 
     /// The newest HF-cache snapshot dir for this repo that has the weights.
     public static func huggingFaceCacheSnapshot() -> URL? {
+        #if os(macOS)
         let home = FileManager.default.homeDirectoryForCurrentUser
+        #else
+        let home = URL(filePath: NSHomeDirectory())
+        #endif
         let snaps = home.appending(path: ".cache/huggingface/hub/models--PaddlePaddle--PP-DocLayoutV3_safetensors/snapshots")
         guard let entries = try? FileManager.default.contentsOfDirectory(
             at: snaps, includingPropertiesForKeys: [.contentModificationDateKey]) else { return nil }
@@ -125,8 +129,8 @@ public enum ModelStore {
                                  relativeTo: nil, bookmarkDataIsStale: &stale) else { return nil }
         _ = url.startAccessingSecurityScopedResource()
         #else
-        guard let url = try? URL(resolvingBookmarkData: data, bookmarkDataIsStale: &stale,
-                                 relativeTo: nil) else { return nil }
+        guard let url = try? URL(resolvingBookmarkData: data, relativeTo: nil,
+                                 bookmarkDataIsStale: &stale) else { return nil }
         #endif
         return url
     }
